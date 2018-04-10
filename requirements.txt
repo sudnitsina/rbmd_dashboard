@@ -1,0 +1,14 @@
+backports-abc==0.5
+bcrypt==3.1.4
+certifi==2018.1.18
+cffi==1.11.5
+chardet==3.0.4
+futures==3.2.0
+idna==2.6
+kazoo==2.4.0
+pycparser==2.18
+requests==2.18.4
+singledispatch==3.4.0.3
+six==1.11.0
+tornado==5.0.1
+urllib3==1.22

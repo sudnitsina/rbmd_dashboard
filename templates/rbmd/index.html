@@ -1,0 +1,85 @@
+<html>
+  <head>
+    <title>RBMD</title>
+    <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <script  src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://www.w3schools.com/lib/w3data.js"></script>
+    <script src="{{ static_url("script.js") }}"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style type="text/css">
+    header {padding:1% 16px;}
+    .w3-btn {font-size:1em;}
+    img {height: 33.82px;}
+    #showDeadlyDetails {display: none; padding:15px;}
+    #statusContainer {height:50px; position:relative;}
+    #resolve {padding:15px;}
+    .tablink, #resolve, #rspContainer, #details {display: none}
+    </style>
+  </head>
+  <body>
+    <header>
+      <a onclick="if (a.health != 'deadly.') {$('#mount').css('display', 'block')}" class="w3-btn" id="mountFormTrigger">
+        Mount <i class="fa fa-hdd-o"></i>
+      </a>
+      <a href='/'><img src="{{ static_url("images-logo.png") }}" class="w3-right w3-hover-opacity"></a>
+    </header>
+    <div class="w3-container">
+      <div class="w3-row">
+        <div class="sidenav w3-container w3-light-grey w3-col m3" id="id01">
+          <h4> Leader: </h4> <span id='leader' class="tablink"></span>
+          <h4>Nodes: </h4>
+          <a w3-repeat="node in quorum" href="javascript:void(0)" class="tablink" onclick="openNode(event, '{{!node}}')">
+            {{!node}}
+          </a>
+          <h4>Metrics: </h4>
+          {% for k, v in metrics.items() %} {{k}} {{v}}<br>
+          {% end %}
+        </div>
+        <div class="w3-col m9" >
+          <div class="w3-container" id="statusContainer">
+            <div class="w3-padding w3-display-left" id="status">Connecting...      </div>
+            <a href="javascript:void(0)" class="w3-right" id="showDeadlyDetails" onclick="openNode(event, deadNode)">
+              Show details
+            </a>
+            <a href="javascript:void(0)" class="w3-right" id="resolve" onClick="resolve()">
+              Resolve
+            </a>
+          </div>
+          <div id="rspContainer" class="w3-container w3-animate-opacity">
+            <span onclick="this.parentElement.style.display='none'" class="w3-closebtn">&times;</span>
+            <div id="rsp"></div>
+          </div>
+          <div id="details" class="w3-container">
+            <table class='w3-table w3-bordered' id="id02">
+              <tr><td> Node:</td> <td><span id='name'></span></td></tr>
+              <tr><td> IPv4:</td> <td><span id='ipv4'></span></td></tr>
+              <tr><td> IPv6:</td> <td><span id='ipv6'></span></td></tr>
+              <tr><td> Updated:</td><td> <span id='updated'></span></td></tr>
+              <tr><td> Mounts:</td><td id="mon"></td></tr>
+            </table>
+
+          </div>
+        </div>
+      </div>
+      <div id="mount" class="w3-modal">
+        <div class="w3-modal-content">
+          <header class="w3-container w3-light-grey">
+            <span onclick="$('#mount').css('display', 'none')" class="w3-closebtn">&times;</span>
+            <h2>Mount</h2>
+          </header>
+          <form method="post" action="/" role="form" class="w3-container form" id="mountForm"> {% module xsrf_form_html() %}
+            <label class="w3-label w3-text-black">Node: <select name="node" class="w3-select" id='selectNode'></select>  </label><br>
+            <label class="w3-label w3-text-black">Pool: <input name="pool" class="w3-input" type="text">  </label><br>
+            <label class="w3-label w3-text-black">Image: <input name="image" class="w3-input" type="text">  </label><br>
+            <label class="w3-label w3-text-black">mountpoint: <input name="mountpoint" class="w3-input" type="text">  </label><br>
+            <label class="w3-label w3-text-black">mountopts: <input name="mountopts" class="w3-input" type="text">  </label><br>
+            <label class="w3-label w3-text-black">fstype: <input name="fstype" class="w3-input" type="text">  </label><br>
+            <button class="w3-btn w3-black" type="submit">Mount</button>
+          </form>
+          <footer class="w3-container w3-light-grey"></footer>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
