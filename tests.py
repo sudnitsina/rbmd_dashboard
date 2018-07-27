@@ -1,15 +1,14 @@
-from unittest import TestCase
-from rbmd import action
 import json
-from mock import patch
-from tornado.testing import AsyncHTTPTestCase, gen_test
-from tornado.httpclient import AsyncHTTPClient, HTTPClient
-import rbmd
-from tornado.options import define, options
-import sqlite3
-import requests
 import os
-from subprocess import Popen, PIPE, call
+from subprocess import call
+from unittest import TestCase
+
+from mock import patch
+from tornado.options import define
+from tornado.testing import AsyncHTTPTestCase
+
+import rbmd
+from rbmd import action
 
 
 def prepare_db():
