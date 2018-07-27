@@ -1,26 +1,22 @@
 #!/usr/bin/env python
 
-import bcrypt
 import json
-from kazoo.client import KazooClient
-from kazoo.recipe.watchers import DataWatch
 import logging
-import requests
+import os
+import os.path
 import sqlite3
+import threading
+
+import bcrypt
+import requests
 import tornado.escape
 import tornado.ioloop
-import tornado.options
 import tornado.web
 import tornado.websocket
-import threading
-import os.path
-import os
-import uuid
-
+from kazoo.client import KazooClient
+from kazoo.recipe.watchers import DataWatch
 from tornado.options import define, options
 
-define("port", default=8000, help="run on the given port", type=int)
-define("sqlite_db", default=os.path.join(os.path.dirname(__file__), "auth.db"), help="User DB")
 
 class Application(tornado.web.Application):
     def __init__(self):
@@ -38,23 +34,26 @@ class Application(tornado.web.Application):
             template_path=os.path.join(os.path.dirname(__file__), "templates/rbmd"),
             static_path=os.path.join(os.path.dirname(__file__), "static/rbmd"),
             xsrf_cookies=True,
-            websocket_ping_interval = 59,
-            login_url="/login",
+            websocket_ping_interval=59,
+            login_url="/login?next=/",
         )
         super(Application, self).__init__(handlers, **settings)
 
 
-class MainHandler(tornado.web.RequestHandler):
-    @tornado.web.authenticated
-    def get(self):
-        user_id = self.get_secure_cookie("user")
-        try: metrics = json.loads(action('metrics', 'get'))
-        except ValueError: metrics = {}
-        dct = {'metrics': metrics}
-        self.render("index.html", **dct)
-
+class BaseHandler(tornado.web.RequestHandler):
     def get_current_user(self):
         return self.get_secure_cookie("user")
+
+
+class MainHandler(BaseHandler):
+    @tornado.web.authenticated
+    def get(self):
+        try:
+            metrics = json.loads(action('metrics', 'get'))
+        except ValueError:
+            metrics = {}
+        dct = {'metrics': metrics}
+        self.render("index.html", **dct)
 
 
 class Auth(tornado.web.RequestHandler):
@@ -71,54 +70,41 @@ class Auth(tornado.web.RequestHandler):
         if not user:
             self.render("login.html", error="user not found")
             return
-        hashed_password = bcrypt.hashpw(tornado.escape.utf8(self.get_argument("password")), tornado.escape.utf8(user[2]))
+
+        hashed_password = bcrypt.hashpw(tornado.escape.utf8(self.get_argument("password")),
+                                        tornado.escape.utf8(user[2]))
         if hashed_password == user[2]:
             self.set_secure_cookie("user", str(user[0]))
             self.redirect("/")
         else:
             self.render("login.html", error="incorrect password")
 
-########### not used ##########################
-#create new user /user?name=user_name&password=user_password
-# class User(tornado.web.RequestHandler):
-#     def get(self):
-#         con = sqlite3.connect(options.sqlite_db)
-#         cur = con.cursor()
-#         data = self.request.arguments
-#         hashed_password = bcrypt.hashpw(tornado.escape.utf8(self.get_argument("password")), bcrypt.gensalt())
-#         cur.execute(
-#             "INSERT INTO users (name, password) VALUES (?, ?)",
-#              (self.get_argument("name"), hashed_password)
-#         )
-#         con.commit()
-#         cur.close()
-#         con.close()
-#         self.write('done')
 
-
-class MountHandler(tornado.web.RequestHandler):
+class MountHandler(BaseHandler):
+    @tornado.web.authenticated
     def post(self):
-        if self.get_secure_cookie("user"):
-            data = {k: v[0] for k, v in self.request.arguments.items()}
-            res = action('mount', 'post', json.dumps(data))
-            self.write(res)
+        data = {k: v[0] for k, v in self.request.arguments.items()}
+        res = action('mount', 'post', json.dumps(data))
+        self.write(res)
 
 
-class UnmountHandler(tornado.web.RequestHandler):
+class UnmountHandler(BaseHandler):
+    @tornado.web.authenticated
     def get(self):
         data = {k: v[0] for k, v in self.request.arguments.items()}
         res = action('umount', 'post', json.dumps(data))
         self.write(res)
 
 
-class ResolveHandler(tornado.web.RequestHandler):
+class ResolveHandler(BaseHandler):
+    @tornado.web.authenticated
     def get(self):
         data = {k: v[0] for k, v in self.request.arguments.items()}
         res = action('resolve', 'post', json.dumps(data))
         self.write(res)
 
 
-class StatusHandler(tornado.web.RequestHandler):
+class StatusHandler(BaseHandler):
     pass
 
 
@@ -134,6 +120,9 @@ class SocketHandler(tornado.websocket.WebSocketHandler):
         return True
 
     def open(self):
+        user_id = self.get_secure_cookie("user")
+        if not user_id:
+            return None
         SocketHandler.waiters.add(self)
         SocketHandler.send_updates(SocketHandler.quorum)
 
@@ -145,7 +134,7 @@ class SocketHandler(tornado.websocket.WebSocketHandler):
         if data == '{}':
             my_data = json.loads(data)
             my_data["health"] = 'service is not available'
-            my_data["quorum"] = [{"node":""}]
+            my_data["quorum"] = [{"node": ""}]
             data = json.dumps(my_data)
         if json.loads(data).get("health") == "deadly.":
             dead_data = action('status', 'get')
@@ -169,41 +158,38 @@ def config(point):
 
 
 def action(name, method, data=None):
-    with open('conf.json') as conf:
-        url = json.load(conf)["api"] + '/' + name
+    url = config("api") + '/' + name
+    try:
         if method == 'get':
-            try:
-                res = requests.get(url).content
-            except:
-                res = 'connection can\'t be established'
+            res = requests.get(url).content
         elif method == 'post':
-            try:
-                res = requests.post(url, data, timeout=10).content
-            except:
-                res = 'connection can\'t be established'
+            res = requests.post(url, data, timeout=10).content
+        else:
+            res = 'method not allowed'
+    except Exception as e:
+        res = 'connection can\'t be established'
+        logging.error(e)
     return res
 
 
 def zk_handler():
     logging.basicConfig()
     zk = KazooClient(hosts=config("zookeeper"))
-    try: zk.start()
-    except: return
+    try:
+        zk.start()
+    except Exception as e:
+        logging.error("Error connecting zk", exc_info=True)
+        return
     t1 = threading.Thread(target=DataWatch, args=(zk, "/rbmd/log/quorum"), kwargs=dict(func=SocketHandler.send_updates))
     t1.setDaemon(True)
     t1.start()
 
 
-########### not used ##########################
-#def zk_fetch(path):
-#    zk = KazooClient(hosts=config("zookeeper"))
-#    zk.start()
-#    data = zk.get(path)
-#    zk.stop()
-
-
 def main():
-    tornado.options.parse_command_line()
+    define("port", default=8000, help="run on the given port", type=int)
+    define("sqlite_db", default=os.path.join(os.path.dirname(__file__), "auth.db"), help="User DB")
+
+    options.parse_command_line()
     zk_handler()
     app = Application()
     app.listen(options.port)

@@ -1,4 +1,3 @@
--- sqlite3 auth.db
 -- sqlite3 auth.db < schema.sql
 
 DROP TABLE IF EXISTS users;

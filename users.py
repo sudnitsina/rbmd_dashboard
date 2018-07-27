@@ -18,13 +18,12 @@ def parse_command_line():
                         help="User name")
     parser.add_argument("-p", "--password",
                         help="User password. If it none password will be generated")
-    parser.add_argument("-b", "--database", default="./auth.db", help="Path to users database")
+    parser.add_argument("-d", "--database", default="./auth.db", help="Path to users database")
     parser.add_argument("--delete", action='store_true', help="Delete user")
     return parser.parse_args()
 
 
 class User:
-
     def __init__(self, args):
         self.args = args
         self.user = args.user
@@ -66,7 +65,8 @@ class User:
         self._commit()
         self._close_connection()
 
-    def _passgen(self):
+    @staticmethod
+    def _passgen():
         chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
         return ''.join(random.choice(chars) for i in range(10))
 

@@ -38,4 +38,4 @@ Run
 ./rbmd.py
 ```
 
-This is a turn on the web server at 0.0.0.0:8000.
+Web server will be started at 0.0.0.0:8000.
