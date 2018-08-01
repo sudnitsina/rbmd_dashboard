@@ -5,6 +5,8 @@ provides interface to monitor cluster data and allows you to mount/umount/resolv
 
 ## Requirements
 Python2.7
+Zookeeper
+[RBMD](https://github.com/Difrex/rbmd)
 
 python-pip
 
