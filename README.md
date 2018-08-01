@@ -4,9 +4,9 @@ Web dashboard for [RBMD](https://github.com/Difrex/rbmd)
 provides interface to monitor cluster data and allows you to mount/umount/resolve.
 
 ## Requirements
-Python2.7
-Zookeeper
-[RBMD](https://github.com/Difrex/rbmd)
+*Python2.7
+*Zookeeper
+*[RBMD](https://github.com/Difrex/rbmd)
 
 python-pip
 
