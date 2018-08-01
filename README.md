@@ -4,11 +4,12 @@ Web dashboard for [RBMD](https://github.com/Difrex/rbmd)
 provides interface to monitor cluster data and allows you to mount/umount/resolve.
 
 ## Requirements
+
 * Python2.7
 * Zookeeper
 * [RBMD](https://github.com/Difrex/rbmd)
 
-python-pip
+## Usage
 
 Install dependencies:
 ```sh
@@ -32,8 +33,6 @@ Change config
     "api": "http://127.0.0.1:9076/v1" // RBMD HTTP API endpoint
 }
 ```
-
-## Usage
 
 Run
 ```sh
