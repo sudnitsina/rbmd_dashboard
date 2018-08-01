@@ -13,7 +13,7 @@ provides interface to monitor cluster data and allows you to mount/umount/resolv
 
 Install dependencies:
 ```sh
-pip install -r requrements.txt --user
+pip install -r requrements.txt
 ```
 
 Apply database schema
