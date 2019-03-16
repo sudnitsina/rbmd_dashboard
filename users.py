@@ -45,7 +45,7 @@ class User:
     def add(self):
         if self.password is None:
             self.password = self._passgen()
-            print "Password has been generated: ", self.password 
+            print("Password has been generated: ", self.password)
         hashed_password = bcrypt.hashpw(self.password.encode('utf-8'), bcrypt.gensalt())
         try: 
             self.connection["cursor"].execute(
@@ -54,7 +54,7 @@ class User:
             )
             self._commit()
         except sqlite3.IntegrityError: 
-            print 'user already exists'
+            print('user already exists')
         self._close_connection()
 
     def delete(self):
