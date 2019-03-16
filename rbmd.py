@@ -131,12 +131,10 @@ class SocketHandler(tornado.websocket.WebSocketHandler):
 
     @classmethod
     def send_updates(cls, data, *stat):
-        if data == '{}':
-            my_data = json.loads(data)
-            my_data["health"] = 'service is not available'
-            my_data["quorum"] = [{"node": ""}]
+        if not data:
+            my_data = {"health": 'service is not available', "quorum": {"node": ""}}
             data = json.dumps(my_data)
-        if json.loads(data).get("health") == "deadly.":
+        elif json.loads(data).get("health") == "deadly.":
             dead_data = action('status', 'get')
             my_data = json.loads(data)
             my_data["deadlyreason"] = json.loads(dead_data)["deadlyreason"]
