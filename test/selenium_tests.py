@@ -4,7 +4,6 @@ httpserver will be run at localhost:9076
 """
 import json
 import logging
-import time
 
 import pytest
 from kazoo.client import KazooClient
@@ -28,7 +27,6 @@ RESPONSES = [
 def zk():
     """Configure data in zookeeper."""
     zk = KazooClient(hosts=ZK_HOST)
-
     try:
         zk.start()
     except Exception:
@@ -50,19 +48,17 @@ def login(driver):
     # login form
     driver.find_element_by_name("username").send_keys("user1")
     driver.find_element_by_name("password").send_keys("password")
-
     driver.find_element_by_xpath("/html/body/form/input[4]").click()
 
 
 def is_text_presented(text, driver):
     try:
-        driver.find_element_by_xpath(f"//*[contains(text(), '{text}')]")
+        driver.find_element_by_xpath("//*[contains(text(), '{}')]".format(text))
         return True
     except NoSuchElementException:
         return False
 
 
-# @pytest.mark.skip
 def test_login(driver, httpserver, zk):
     """Login -> main page"""
     zk.create(
@@ -79,10 +75,7 @@ def test_login(driver, httpserver, zk):
 
     driver.find_element_by_link_text("node.example.com").click()
 
-    status_container = driver.find_element_by_xpath('//*[@id="statusContainer"]')
-
     assert is_text_presented("Mountpoint: 123", driver)
-
     assert not is_text_presented("Mountsds", driver)
 
 
@@ -140,7 +133,7 @@ def test_deadly(driver, httpserver, zk):
 
     driver.find_element_by_link_text(
         "Show details"
-    ).click()  # TODO: add details verification
+    ).click()
 
     driver.find_element_by_link_text("Resolve").click()
 
@@ -155,8 +148,7 @@ def test_deadly(driver, httpserver, zk):
 
     driver.find_element_by_link_text(
         "node.example.com"
-    ).click()  # BUG: red frame should disappear after resolve
-    time.sleep(2)  # and status is alive, but it doesn't
+    ).click()
 
 
 def test_resizing(driver, zk):
@@ -181,7 +173,3 @@ def test_resizing(driver, zk):
         driver.find_element_by_id("status").find_element_by_tag_name("p").text
         == "alive"
     )
-
-
-"""https://stackoverflow.com/questions/53705219/how-to-separate-tests-and-fixtures"""
-"""https://flowfx.de/blog/test-django-with-selenium-pytest-and-user-authentication/"""

@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/sudnitsina/rbmd_dashboard.svg?branch=feature%2Fdummy_zookeeper)](https://travis-ci.org/sudnitsina/rbmd_dashboard)
 # rbmd web panel
 
 Web dashboard for [RBMD](https://github.com/Difrex/rbmd)
