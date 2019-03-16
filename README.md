@@ -41,3 +41,10 @@ Run
 ```
 
 Web server will be started at 0.0.0.0:8000.
+
+To run app in docker container:
+
+```sh
+docker build -t rbmd PROJECT_DIRECTORY
+docker run -ti --network="host" rbmd
+```
