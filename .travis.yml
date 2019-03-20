@@ -24,15 +24,12 @@ install:
   - pip install pytest-httpserver
 
 before_install:
-  - python2 -m pip install --user -r requirements.txt
-
   - docker run -d zookeeper
+  - docker build -t rbmd .
+  - docker run -d --network="host" rbmd
   - wget https://github.com/mozilla/geckodriver/releases/download/v0.21.0/geckodriver-v0.21.0-linux64.tar.gz
   - tar -xvf geckodriver-v0.21.0-linux64.tar.gz
   - export PATH=$PATH:$PWD
-  - sqlite3 auth.db < schema.sql
-  - python2 users.py -u user1 -p password
-  - python2 rbmd.py &
 
 script:
   - PYTEST_HTTPSERVER_PORT=9076 py.test -s test/selenium_tests.py
