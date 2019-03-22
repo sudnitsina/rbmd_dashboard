@@ -38,7 +38,7 @@ class AuthTest(AsyncHTTPTestCase):
         return self.app
 
     def test_login_redirect(self):
-        response = self.fetch('/',method='GET')
+        response = self.fetch('/', method='GET')
         self.assertEqual(response.effective_url, self.get_url('/login?next=/'))
         self.assertEqual(response.code, 200)
 
@@ -47,7 +47,7 @@ class AuthTest(AsyncHTTPTestCase):
         secure = response.headers["Set-Cookie"]
         print(response)
         headers = {"Cookie": secure}
-        response = self.fetch('/login',  raise_error=True, method='POST',
+        response = self.fetch('/login', raise_error=True, method='POST',
                               body="username=tester&password=tester&%s" % secure,
                               headers=headers, follow_redirects=False)
         self.assertEqual(response.code, 302)
@@ -81,5 +81,3 @@ class ActionTest(TestCase):
     def test_put(self):
         res = action('resolve', 'put', json.dumps({'a': 1}))
         assert res == "method not allowed"
-
-

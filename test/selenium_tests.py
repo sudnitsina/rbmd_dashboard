@@ -4,6 +4,7 @@ httpserver will be run at localhost:9076
 """
 import json
 import logging
+from collections import namedtuple
 
 import pytest
 from kazoo.client import KazooClient
@@ -12,6 +13,7 @@ from selenium.webdriver.firefox.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 
 from test import test_data
+from test.page import LoginPage
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,6 +23,8 @@ RESPONSES = [
     {"state": "OK", "message": "OK"},
     {"state": "FAIL", "message": "Not found"},
 ]
+
+STATUS = namedtuple("Status", "alive resizing deadly")("alive", "resizing", "deadly.")
 
 
 @pytest.fixture
@@ -45,10 +49,7 @@ def driver():
 
 
 def login(driver):
-    # login form
-    driver.find_element_by_name("username").send_keys("user1")
-    driver.find_element_by_name("password").send_keys("password")
-    driver.find_element_by_xpath("/html/body/form/input[4]").click()
+    return LoginPage(driver).login("user1", "password")
 
 
 def is_text_presented(text, driver):
@@ -59,36 +60,30 @@ def is_text_presented(text, driver):
         return False
 
 
+def prepare_data(zk, data=None):
+    data = data or json.dumps(test_data.STATUS_JSON).encode("utf-8")
+    zk.create("/rbmd/log/quorum", data, ephemeral=True, makepath=True)
+
+
 def test_login(driver, httpserver, zk):
     """Login -> main page"""
-    zk.create(
-        "/rbmd/log/quorum",
-        json.dumps(test_data.STATUS_JSON).encode("utf-8"),
-        ephemeral=True,
-        makepath=True,
-    )
-    login(driver)
+    prepare_data(zk)
+    dashboard = login(driver)
 
     httpserver.expect_request("/v1/metrics").respond_with_json(
         json.dumps(test_data.METRICS)
     )
 
-    driver.find_element_by_link_text("node.example.com").click()
+    dashboard.open_node("node.example.com")
 
     assert is_text_presented("Mountpoint: 123", driver)
-    assert not is_text_presented("Mountsds", driver)
 
 
 @pytest.mark.parametrize("res", RESPONSES)
 def test_unmount(res, driver, httpserver, zk):
-    zk.create(
-        "/rbmd/log/quorum",
-        json.dumps(test_data.STATUS_JSON).encode("utf-8"),
-        ephemeral=True,
-        makepath=True,
-    )
+    prepare_data(zk)
 
-    login(driver)
+    dashboard = login(driver)
 
     mydata = {"node": "node.example.com", "mountpoint": "123", "block": ""}
 
@@ -97,23 +92,17 @@ def test_unmount(res, driver, httpserver, zk):
         "/v1/umount", data=json.dumps(mydata), method="POST"
     ).respond_with_json(res)
 
-    driver.find_element_by_link_text("node.example.com").click()
-    driver.find_element_by_link_text("unmount").click()
+    dashboard.open_node("node.example.com")
+    dashboard.unmount()
 
-    driver.switch_to.alert.accept()
+    dashboard.accept_alert()
 
-    assert WebDriverWait(driver, 10).until(
+    assert WebDriverWait(dashboard.driver, 10).until(
         lambda x: x.find_element_by_id("rsp").is_displayed()
     )
 
-    assert (
-        driver.find_element_by_id("rsp").find_element_by_tag_name("h3").text
-        == res["state"]
-    )
-    assert (
-        driver.find_element_by_id("rsp").find_element_by_tag_name("p").text
-        == res["message"]
-    )
+    assert dashboard.get_result() == res["state"]
+    assert dashboard.get_message() == res["message"]
 
 
 def test_deadly(driver, httpserver, zk):
@@ -123,53 +112,31 @@ def test_deadly(driver, httpserver, zk):
         "/v1/resolve", data='{"node": "node.example.com"}', method="POST"
     ).respond_with_json(test_data.STATUS_API)
 
-    zk.create("/rbmd/log/quorum", test_data.STATUS, ephemeral=True, makepath=True)
-    login(driver)
+    prepare_data(zk, data=test_data.STATUS)
+    dashboard = login(driver)
 
-    assert (
-        driver.find_element_by_id("status").find_element_by_tag_name("p").text
-        == "deadly."
-    )
+    assert dashboard.get_status() == STATUS.deadly
 
-    driver.find_element_by_link_text(
-        "Show details"
-    ).click()
+    dashboard.show_details()
+    dashboard.resolve()
 
-    driver.find_element_by_link_text("Resolve").click()
-
-    test_data.STATUS_JSON["health"] = "alive"
+    test_data.STATUS_JSON["health"] = STATUS.alive
 
     zk.set("/rbmd/log/quorum", json.dumps(test_data.STATUS_JSON).encode("utf-8"))
 
-    assert (
-        driver.find_element_by_id("status").find_element_by_tag_name("p").text
-        == "alive"
-    )
+    assert dashboard.get_status() == STATUS.alive
 
-    driver.find_element_by_link_text(
-        "node.example.com"
-    ).click()
+    dashboard.open_node("node.example.com")
 
 
 def test_resizing(driver, zk):
     test_data.STATUS_JSON["health"] = "resizing."
-    zk.create(
-        "/rbmd/log/quorum",
-        json.dumps(test_data.STATUS_JSON).encode("utf-8"),
-        ephemeral=True,
-        makepath=True,
-    )
-    login(driver)
+    prepare_data(zk)
+    d = login(driver)
 
-    assert (
-        driver.find_element_by_id("status").find_element_by_tag_name("p").text
-        == "resizing."
-    )
+    assert d.get_status() == "resizing."
 
-    test_data.STATUS_JSON["health"] = "alive"
+    test_data.STATUS_JSON["health"] = STATUS.alive
     zk.set("/rbmd/log/quorum", json.dumps(test_data.STATUS_JSON).encode("utf-8"))
 
-    assert (
-        driver.find_element_by_id("status").find_element_by_tag_name("p").text
-        == "alive"
-    )
+    assert d.get_status() == STATUS.alive
