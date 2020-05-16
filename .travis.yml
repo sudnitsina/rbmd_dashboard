@@ -24,6 +24,7 @@ install:
   - pip install pytest-httpserver
   - pip install pytest-html
   - pip install pytest-selenium
+  - pip install pyTelegramBotAPI
 
 before_install:
   - docker run -d zookeeper
@@ -35,3 +36,4 @@ before_install:
 
 script:
   - PYTEST_HTTPSERVER_PORT=9076 py.test -s test/selenium_tests.py --html=report.html --self-contained-html --driver Firefox
+  - python test/telegram_notification.py
