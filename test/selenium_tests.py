@@ -9,7 +9,6 @@ from collections import namedtuple
 import pytest
 from kazoo.client import KazooClient
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.firefox.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 
 from test import test_data
@@ -39,14 +38,10 @@ def zk():
     yield zk
     zk.stop()
 
-
 @pytest.fixture
-def driver():
-    driver = WebDriver()
-    driver.get("http://127.0.0.1:8000/")
-    yield driver
-    driver.quit()
-
+def driver(selenium):
+    selenium.get("http://127.0.0.1:8000/")
+    yield selenium
 
 def login(driver):
     return LoginPage(driver).login("user1", "password")

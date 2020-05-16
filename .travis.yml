@@ -22,6 +22,8 @@ install:
   - pip install kazoo
   - pip install pytest
   - pip install pytest-httpserver
+  - pip install pytest-html
+  - pip install pytest-selenium
 
 before_install:
   - docker run -d zookeeper
@@ -32,4 +34,4 @@ before_install:
   - export PATH=$PATH:$PWD
 
 script:
-  - PYTEST_HTTPSERVER_PORT=9076 py.test -s test/selenium_tests.py
+  - PYTEST_HTTPSERVER_PORT=9076 py.test -s test/selenium_tests.py --html=report.html --self-contained-html --driver Firefox
