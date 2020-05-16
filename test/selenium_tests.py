@@ -7,7 +7,6 @@ import logging
 from collections import namedtuple
 
 import pytest
-from kazoo.client import KazooClient
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -16,7 +15,6 @@ from test.page import LoginPage
 
 logging.basicConfig(level=logging.INFO)
 
-ZK_HOST = "172.17.0.2:2181"
 
 RESPONSES = [
     {"state": "OK", "message": "OK"},
@@ -26,28 +24,22 @@ RESPONSES = [
 STATUS = namedtuple("Status", "alive resizing deadly")("alive", "resizing", "deadly.")
 
 
-@pytest.fixture
-def zk():
-    """Configure data in zookeeper."""
-    zk = KazooClient(hosts=ZK_HOST)
-    try:
-        zk.start()
-    except Exception:
-        logging.error("Error connecting zk", exc_info=True)
-
-    yield zk
-    zk.stop()
-
-@pytest.fixture
-def driver(selenium):
-    selenium.get("http://127.0.0.1:8000/")
-    yield selenium
-
 def login(driver):
     return LoginPage(driver).login("user1", "password")
 
 
+def set_status_alive(zk):
+    test_data.STATUS_JSON["health"] = STATUS.alive
+    zk.set("/rbmd/log/quorum", json.dumps(test_data.STATUS_JSON).encode("utf-8"))
+
+
+@pytest.fixture
+def dashboard(driver):
+    return login(driver)
+
+
 def is_text_presented(text, driver):
+    """Return True if element with specified test can be found, False otherwise."""
     try:
         driver.find_element_by_xpath("//*[contains(text(), '{}')]".format(text))
         return True
@@ -55,14 +47,19 @@ def is_text_presented(text, driver):
         return False
 
 
-def prepare_data(zk, data=None):
-    data = data or json.dumps(test_data.STATUS_JSON).encode("utf-8")
+@pytest.fixture(params=[test_data.STATUS_JSON])
+def prepare_zk_data(request, zk):
+    data = (
+        request.param
+        if isinstance(request.param, bytes)
+        else json.dumps(request.param).encode("utf-8")
+    )
     zk.create("/rbmd/log/quorum", data, ephemeral=True, makepath=True)
 
 
-def test_login(driver, httpserver, zk):
+def test_login(driver, httpserver, prepare_zk_data):
     """Login -> main page"""
-    prepare_data(zk)
+
     dashboard = login(driver)
 
     httpserver.expect_request("/v1/metrics").respond_with_json(
@@ -75,13 +72,9 @@ def test_login(driver, httpserver, zk):
 
 
 @pytest.mark.parametrize("res", RESPONSES)
-def test_unmount(res, driver, httpserver, zk):
-    prepare_data(zk)
-
-    dashboard = login(driver)
-
+def test_unmount(res, httpserver, prepare_zk_data, dashboard):
+    """Test that ok/fail responses on unmount request are correctly displayed."""
     mydata = {"node": "node.example.com", "mountpoint": "123", "block": ""}
-
     httpserver.expect_request("/v1/metrics").respond_with_json(test_data.METRICS)
     httpserver.expect_request(
         "/v1/umount", data=json.dumps(mydata), method="POST"
@@ -100,38 +93,41 @@ def test_unmount(res, driver, httpserver, zk):
     assert dashboard.get_message() == res["message"]
 
 
-def test_deadly(driver, httpserver, zk):
+@pytest.fixture
+def prepare_http_server(httpserver):
+    """Set http server to get response from v1/status and /v1/resolve endpoints."""
     httpserver.expect_request("/v1/status").respond_with_json(test_data.STATUS_API)
 
     httpserver.expect_request(
         "/v1/resolve", data='{"node": "node.example.com"}', method="POST"
     ).respond_with_json(test_data.STATUS_API)
 
-    prepare_data(zk, data=test_data.STATUS)
-    dashboard = login(driver)
+
+@pytest.mark.parametrize("prepare_zk_data", [test_data.STATUS], indirect=True)
+def test_resolve_deadly(prepare_http_server, prepare_zk_data, zk, dashboard):
+    """Test that status can be changed from deadly to alive by clicking resolve."""
 
     assert dashboard.get_status() == STATUS.deadly
 
     dashboard.show_details()
     dashboard.resolve()
 
-    test_data.STATUS_JSON["health"] = STATUS.alive
-
-    zk.set("/rbmd/log/quorum", json.dumps(test_data.STATUS_JSON).encode("utf-8"))
+    set_status_alive(zk)
 
     assert dashboard.get_status() == STATUS.alive
 
     dashboard.open_node("node.example.com")
 
+    # TODO: add check
 
-def test_resizing(driver, zk):
-    test_data.STATUS_JSON["health"] = "resizing."
-    prepare_data(zk)
-    d = login(driver)
 
-    assert d.get_status() == "resizing."
+@pytest.mark.parametrize(
+    "prepare_zk_data", [dict(test_data.STATUS_JSON, health="resizing.")], indirect=True
+)
+def test_resizing_to_alive(zk, prepare_zk_data, dashboard):
+    """Test that displayed status is changed from resizing to alive."""
+    assert dashboard.get_status() == "resizing."
 
-    test_data.STATUS_JSON["health"] = STATUS.alive
-    zk.set("/rbmd/log/quorum", json.dumps(test_data.STATUS_JSON).encode("utf-8"))
+    set_status_alive(zk)
 
-    assert d.get_status() == STATUS.alive
+    assert dashboard.get_status() == STATUS.alive
